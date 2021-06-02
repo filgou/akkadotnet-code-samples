@@ -2,12 +2,15 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Net.NetworkInformation;
-using System.Threading;
+using System.Timers;
 using Actors;
 using Akka.Actor;
 using Akka.Actor.Internal;
+using Akka.Cluster;
 using Akka.Cluster.Tools.Client;
+using Akka.Cluster.Tools.PublishSubscribe;
 using Akka.Configuration;
+using Akka.Routing;
 using App_Client.Actors;
 using Cluster_Server.Actors;
 
@@ -17,10 +20,12 @@ namespace App_Client
     {
         public static ActorSystem MyActorSystem;
         private const string TcpProtocol = "akka.tcp";
+        private static IActorRef clusterClient;
+        private static IActorRef subscriber;
 
         static void Main(string[] args)
         {
-            Console.Title = "Client";
+            Console.Title = $"Client:{Ports.Client}";
             Console.ForegroundColor = ConsoleColor.DarkMagenta;
 
             Config config = AkkaDistributedHelper.GetAkkaSettings();
@@ -32,7 +37,7 @@ namespace App_Client
                 .WithFallback(string.Format("akka.cluster.roles = [\"{0}\"]", NamesRegistry.Client))
                 .WithFallback(string.Format("akka.cluster.seed-nodes = [\"{1}://App-Client@{0}\"]",
                     routerAddress, AkkaDistributedHelper.TcpProtocol));
-            MyActorSystem = ActorSystem.Create("App-Client", config);
+            MyActorSystem = ActorSystem.Create("App-Client");
 
             
             bool isClusterClientInitialized = false;
@@ -60,6 +65,7 @@ namespace App_Client
             
             IActorRef router = MyActorSystem.ActorSelection(routerActorPath).ResolveOne(TimeSpan.FromSeconds(30)).Result;
             router.Tell(new RouterActor.ShutdownRequested());
+
             Console.WriteLine();
             Console.WriteLine("Exiting, sent shutdown...");
         }
@@ -71,13 +77,23 @@ namespace App_Client
             ImmutableHashSet<ActorPath> initialContacts = ImmutableHashSet.Create(ActorPath.Parse(receptionistActorPath));
 
             var settings = ClusterClientSettings.Create(MyActorSystem).WithInitialContacts(initialContacts);
-            IActorRef clusterClient = MyActorSystem.ActorOf(ClusterClient.Props(settings), "Client");
+            clusterClient = MyActorSystem.ActorOf(ClusterClient.Props(settings), "Client");
             
-            MyActorSystem.ActorOf(Props.Create<ProgressSubscriberActor>(), NamesRegistry.ProgressSubscriber);
-            var subscirberAddress = string.Format("{3}://App-Client@{0}:{1}/user/{2}",
-                AkkaDistributedHelper.GetFullyQualifiedDomainName(), Ports.Client, NamesRegistry.ProgressSubscriber, TcpProtocol);
-            clusterClient.Tell(new ClusterClient.SendToAll($"/user/{NamesRegistry.ProgressPublisher}",
-                new ProgressPublisherActor.ProgressUpdateRequest {RespondTo = subscirberAddress}));
+            subscriber = MyActorSystem.ActorOf(Props.Create<ProgressSubscriberActor>(), NamesRegistry.ProgressSubscriber);
+
+            Timer progressTimer = new Timer
+            {
+                Interval = 500
+            };
+
+            progressTimer.Enabled = true;
+            progressTimer.Elapsed += (sender, args) =>
+            {
+                object response = clusterClient.Ask(new ClusterClient.Publish(NamesRegistry.ProgressTopic,
+                    new ProgressPublisherActor.ProgressUpdateRequest())).Result;
+                subscriber.Tell(response);
+            };
+
             Console.WriteLine($"Created Subscriber for progress updates: {clusterClient.Path} on {MyActorSystem.Name}");
         }
     }

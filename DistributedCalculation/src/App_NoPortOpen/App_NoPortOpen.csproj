@@ -6,20 +6,15 @@
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <OutputPath>..\bin\$(Configuration)\</OutputPath>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-    <OutputPath>..\bin\$(Configuration)\</OutputPath>
+    <OutputPath>..\bin\Debug\</OutputPath>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Akka" Version="1.4.17" />
-    <PackageReference Include="Akka.Cluster" Version="1.4.17" />
-    <PackageReference Include="Akka.Cluster.Tools" Version="1.4.17" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Cluster_Router\Cluster_Router.csproj" />
     <ProjectReference Include="..\Cluster_Server\Cluster_Server.csproj" />
     <ProjectReference Include="..\Common\Common.csproj" />
   </ItemGroup>

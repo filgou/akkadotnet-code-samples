@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Threading;
-using Actors;
 using Akka.Actor;
 using Akka.Util.Internal;
 
@@ -14,7 +13,7 @@ namespace Cluster_Server.Actors
         
         public class JobRequested
         {
-            public int JobSize { get; set; } = 3;
+            public int JobSize { get; set; } = 300;
         }
 
         public class ShutdownRequested

@@ -54,6 +54,22 @@ namespace Cluster_Server.Actors
                 // and allows the application to exit.
                 Context.System.Terminate();
             });
+
+            Receive<ProgressPublisherActor.ProgressUpdate>(s =>
+            {
+                Console.WriteLine($"Received progress update, {s.Progress}");
+                // shut down the entire actor system via the ActorContext
+                // causes MyActorSystem.AwaitTermination(); to stop blocking the current thread
+                // and allows the application to exit.
+                Context.System.Terminate();
+            });
+        }
+
+        protected override void PreStart()
+        {
+            var c = ClusterClientReceptionist.Get(Context.System);
+            //c.RegisterService(Self);
+            
         }
     }
 }

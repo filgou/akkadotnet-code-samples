@@ -11,12 +11,11 @@ namespace Cluster_Server.Actors
 {
     public class ProgressPublisherActor : UntypedActor
     {
-        private string _lastUpdate;
+        private string _lastUpdate = "not started";
         private IActorRef _subscriber;
 
         public class ProgressUpdateRequest
         {
-            public string RespondTo { get; set; }
         }
 
         public class ProgressUpdate
@@ -34,17 +33,16 @@ namespace Cluster_Server.Actors
             {
                 var originalColor = Console.ForegroundColor;
                 Console.ForegroundColor = ConsoleColor.Cyan;
-                if (message is ProgressUpdateRequest progressUpdateRequest)
-                {
-                    _subscriber = Context.System.ActorSelection(progressUpdateRequest.RespondTo).ResolveOne(TimeSpan.FromSeconds(30))
-                        .Result;
-                    Console.WriteLine($"{Self.Path}: Progress Publisher received subscriber: {_subscriber.Path}.");
-                }
-                else if (message is ProgressUpdate progressUpdate)
+               
+                if (message is ProgressUpdate progressUpdate)
                 {
                     _lastUpdate = progressUpdate.Progress;
-                    Console.WriteLine($"{Self.Path}: Progress Publisher forwarding message: {progressUpdate}.");
-                    _subscriber.Tell(progressUpdate, Self);
+                    Console.WriteLine($"{Self.Path}: Progress Publisher acknowledged progress update message: {progressUpdate.Progress}.");
+                }
+                else if (message is ProgressUpdateRequest progressUpdateRequest)
+                {
+                    Sender.Tell(new ProgressUpdate {Progress = _lastUpdate});
+                    Console.WriteLine($"{Self.Path}: Progress Publisher replying message: {Sender.Path}.");
                 }
 
                 Console.ForegroundColor = originalColor;
@@ -60,7 +58,8 @@ namespace Cluster_Server.Actors
         protected override void PreStart()
         {
            var c = ClusterClientReceptionist.Get(Context.System);
-           c.RegisterService(Self);
+           //c.RegisterService(Self);
+           c.RegisterSubscriber(NamesRegistry.ProgressTopic, Self);
         }
     }
 }
